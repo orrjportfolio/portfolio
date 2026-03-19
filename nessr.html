@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Jackson Orr’s Portfolio</title>
+		<link rel="stylesheet" href="styles.css" />
+	</head>
+	<body>
+		<div class="content">
+			<h1>NES Static Recompiler</h1>
+			<hr />
+			<p>This project is a static recompiler that translates iNES ROMs into native executables for modern systems. It lifts 6502 machine code into C++, compiles that code against an emulated NES graphics and I/O runtime, and produces working binaries that outperform a pure emulator on the same runtime.</p>
+			<div class="center-content"><video src="videos/nessr/demo.mp4" controls width="80%"></video></div>
+			<h3>Scope</h3>
+			<p>This project was developed over a 3-month undergraduate dissertation as a proof-of-concept. Audio emulation and games that used memory mapping were deliberately excluded to save time.</p>
+			<h3>Key Technical Highlights</h3>
+			<ul>
+				<li>Static translation pipeline lifting 6502 machine code into C++</li>
+				<li>Heuristic code discovery for symbol-less binaries</li>
+				<li>Basic-block based translation with overlapping block support</li>
+				<li>Interpreter fallback for unresolved indirect control flow</li>
+				<li>Profile-guided optimisation of interrupt polling and translation seeds</li>
+			</ul>
+			<h2>Why Static Recompilation?</h2>
+			<hr />
+			<p>Static recompilation is appealing because it allows performance optimisations that would be impossible with emulation. For instance, emulators must implement fetching and decoding behaviour in software that must run for every CPU instruction. This can be completely omitted from recompiled code, which implicitly delegates that functionality to the host hardware.</p>
+			<p>The tradeoff is that extracting performance from static recompilation requires reducing runtime accuracy and potentially breaking certain games that depend on very specific behaviours of the NES. In practice, however, only a <a href="https://www.nesdev.org/wiki/Tricky-to-emulate_games">minority of games</a> do this.</p>
+			<p>Although NES emulators easily run games at full speed on modern devices - even mobile phones - static recompilation could be a solution for improving battery life or bringing games to cheaper and more underpowered devices.</p>
+			<h2>Addressing Challenges</h2>
+			<hr />
+			<p>Developing this required overcoming several challenges:</p>
+			<ul>
+				<li>Code discovery - identifying executable code in a ROM with no symbol information</li>
+				<li>Pointer translation - remapping ROM and RAM references into host representations</li>
+				<li>Interrupt handling - approximating NES interrupt timing efficiently in host code</li>
+				<li>Self-referential control flow: supporting techniques like instruction overlap and modified return addresses</li>
+			</ul>
+			<h3>Binary Disassembly Without Symbols</h3>
+			<p>Disassembling code from a binary with no symbol information is a known hard problem - actually <a href="https://doi.org/10.1093/comjnl/23.3.223">it is equivalent to the halting problem.</a> In the general case, code and data cannot be perfectly distinguished in an unannotated binary. The approach I took therefore had to be heuristic.</p>
+			<p>Inspired by <a href="https://doi.org/10.1109/CASES.2013.6662525">a paper</a> about ARM→x64 translation, I decided on a liberal method that would translate anything that looked like code as if it were, deliberately preferring overtranslation to undertranslation. Any data mistranslated as code would simply never execute during runtime.</p>
+			<p>This is the process:</p>
+			<ol>
+				<li>Scan the ROM for any sequence of bytes that could be interpreted as a valid code pointer.</li>
+				<li>Disassemble a linear sequence of instructions beginning at each of those pointers and ending at a control flow instruction such as a branch or jump.</li>
+				<li>For each conditional branch encountered, if either or both of its targets haven't been seen before, record them in a new list of pointers. Then repeat step 2.</li>
+			</ol>
+			<h3>Code Generation Strategy</h3>
+			<p>I translated code as basic blocks. A block starts at a control-flow target and ends at the next control-flow instruction (branch, jump, call, return, interrupt return, etc). Each block is emitted as a C++ function, allowing control flow to become direct C++ calls between blocks instead of a fetch/decode loop.</p>
+			<p>To support ROM tricks like overlapping instruction streams, I allowed overlapping blocks. This means some bytes may be translated more than once, but it preserves correctness when the same address is reached in different execution contexts.</p>
+			<p>At runtime, every translated block follows the same structure: it updates the emulated environment with accumulated CPU cycles, checks for an interrupt, executes the translated instructions, increments the cycle counter by the block’s total cost, and tail-calls the next block. CPU state, RAM, and ROM live in shared runtime variables, while instruction behavior is implemented through small helper functions for common CPU operations.</p>
+			<p>For indirect control flow, the runtime uses a 16-bit lookup table mapping NES addresses to translated block entry points. If a target has no translated block, execution falls back to an instruction emulator until control reaches translated code again. This keeps unusual patterns, including modified return addresses, working without needing fully dynamic recompilation.</p>
+			<h3>Interrupt Simulation Tradeoff</h3>
+			<p>On real NES hardware, interrupts are polled-for after each instruction. Reproducing that literally in translated code would require an interrupt test after every emitted instruction, which adds branch overhead almost everywhere and erodes the speed benefits of static recompilation.</p>
+			<p>I chose to poll for interrupts at block boundaries instead. In practice that means checking after each translated jump/branch. Every block begins with an interrupt check, and in the dispatcher the same check exists before fallback emulation continues.</p>
+			<p>This is an accuracy tradeoff: interrupt latency can be up to one block. But in testing it did not cause visible issues in the games I tried, and it kept the generated code much simpler and faster.</p>
+			<h3>Profile-Guided Optimisations</h3>
+			<p>Because translation quality depends on what code actually executes, I added lightweight profiling hooks so runtime behavior can feed back into later translation passes.</p>
+			<p>Two profiles were especially useful:</p>
+			<ol>
+				<li>Jump-target profile: record which ROM addresses were actually reached, then use those as direct translation seeds instead of relying only on static pointer heuristics.</li>
+				<li>Interrupt-location profile: record where interrupts were observed, then keep expensive interrupt checks/environment sync only where interrupts actually occur.</li>
+			</ol>
+			<p>These profiles are emitted by optionally enabled runtime instrumentation and can be written to files for reuse by the translator. In many games, interrupts occur in a small number of hot wait loops, so this can remove a large amount of per-block overhead in the rest of the code.</p>
+			<h2>Results</h2>
+			<hr />
+			<p>To evaluate the translator, I benchmarked the same mapper 0 homebrew shown in the video, *GunTneR*, on a local Ubuntu 24.04.4 system with a Ryzen 7 9800X3D CPU. I ran 600 frames with no input, allowing the game to settle into its attract mode, and recorded the time from one NMI to the next while excluding rendering overhead and any sleep used to maintain 60 Hz. I compared three configurations on the same runtime: pure emulation, static recompilation, and static recompilation with the profile-guided optimisations described above.</p>
+			<p>Even though the runtime still emulates the NES PPU, I/O hardware, and falls back to an interpreter for unresolved control flow, the statically recompiled build still achieved a 6.48% speedup, increasing to 8.49% with profile-guided optimisation. The results show that even a relatively simple static recompiler can produce a measurable performance improvement over a pure emulator running on the same runtime.</p>
+			<p>The plots below show the same result in two forms: frame-by-frame timings across the 600-frame run, and the average time for each configuration.</p>
+			<div class="center-content"><image src="images/nessr/graph1.png" width="80%"/></div>
+			<div class="center-content"><image src="images/nessr/graph2.png" width="80%"/></div>
+			<h2>Reflection</h2>
+			<hr />
+			<p>This project gave me a much clearer view of what static recompilation can and cannot do. Code discovery in an unannotated binary is inherently heuristic, indirect control flow cannot be resolved perfectly in the general case, and translation becomes harder as the gap widens between the source and target execution environments. In practice, that meant accepting that recompilation could not replace emulation entirely: even in the translated build, I still needed to emulate the PPU and I/O, and to retain a fallback emulator for cases that could not be handled statically.</p>
+			<p>Those constraints shaped several deliberate compromises. I limited the scope to games that didn't use <a href="https://www.nesdev.org/wiki/Mapper">memory mapping</a> and chose block-level interrupt polling rather than cycle-accurate execution, which kept the translator tractable and the generated code simple enough to optimise. Even with those simplifications, the design succeeded in its main aim: it ran a range of licensed and homebrew mapper 0 games with few visible accuracy issues, and it delivered a measurable speedup over emulation on the same runtime.</p>
+			<p>If I were extending the project, the most useful next steps would be memory mapper support, a faster or GPU-accelerated PPU implementation, and more aggressive optimisation of how CPU state is represented in generated code. More broadly, I am interested in continuing to improve my knowledge and skills around the intersection of recompilation and reverse engineering: building tools that recover, analyse, and transform existing binaries while accounting for the messy constraints of real systems.</p>
+		</div>
+	</body>
+</html>

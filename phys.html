@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Jackson Orr’s Portfolio</title>
+		<link rel="stylesheet" href="styles.css" />
+	</head>
+	<body>
+		<div class="content">
+			<h1>3D Physics Engine + Racing Game</h1>
+			<hr />
+			<p>This project is a small time-trial racing game built on top of a custom 3D rigid body physics engine written from scratch. It was built in C++ using SDL2, OpenGL, GLM, and ImGui. </p>
+			<div class="center-content"><video src="videos/phys/demo.mp4" controls width="80%"></video></div>
+			<h3>Scope</h3>
+			<p>This was developed as a solo project over a 3-month university module, <em>Physics for Game Development</em>. The assessment focused much more heavily on the physics simulation than on visual presentation, so I treated the game primarily as a vehicle for testing and demonstrating the engine.</p>
+			<h3>Key Technical Highlights</h3>
+			<ul>
+				<li>Custom 3D rigidbody physics system for spheres, AABBs, and OBBs</li>
+				<li>Impulse-based collision response</li>
+				<li>Velocity verlet integration</li>
+				<li>Data-oriented struct-of-arrays layout for rigidbody properties</li>
+				<li>Octree broad-phase collision culling</li>
+				<li>Sleeping system for inactive bodies</li>
+				<li>Custom OpenGL renderer with collision visualisation</li>
+			</ul>
+			<h2>Process</h2>
+			<hr />
+			<p>I used an iterative process to develop the physics engine, making use of prototypes, and testing each part thoroughly before moving on to the next. My process was:</p>
+			<ul>
+				<li>Start with a 2D prototype to get a handle on the maths and physics</li>
+				<li>Implement a 3D renderer with simple lighting and support for debug lines</li>
+				<li>Create intersection detection routines for each pair of shapes </li>
+				<li>Implement rigidbodies using impulse-based collision response</li>
+				<li>Add optimisations including an octree-based broad-phase</li>
+				<li>Develop the racing game</li>
+			</ul>
+			<h3>From 2D to 3D</h3>
+			<p>I started with a simpler 2D prototype in Raylib to work through the maths and collision response, which helped me get comfortable with collision response, impulses, and friction. I used online resources to help me with this, particularly <a href="https://chrishecker.com/Rigid_Body_Dynamics">Chris Hecker&#39;s rigid body dynamics articles</a>.</p>
+			<div class="center-content"><video src="videos/phys/prototype.mp4" controls width="80%"></video></div>
+			<p>Once I was happy with that, I moved on to implementing a basic 3D renderer, as it was important to me that I was able to use visualisations for testing. The renderer supported drawing oriented spheres and boxes using simple directional lighting as well as debug lines, and outline rendering for collision volumes. In practice, those diagnostics were very useful for debugging issues I would encounter.</p>
+			<div class="center-content"><image src="images/phys/debug.png" width="80%"/></div>
+			<h3>Collision Detection and Contact Data</h3>
+			<p>The physics engine supports spheres, axis-aligned bounding boxes, and oriented bounding boxes. For each pair type, I implemented overlap tests that produced a penetration normal and depth, then separate routines to generate contact points. To verify the correctness of those functions, I built a simple test scene where I could move shapes around with the keyboard and see them highlight when they intersected.</p>
+			<div class="center-content"><video src="videos/phys/overlaps.mp4" controls width="80%"></video></div>
+			<p>Sphere and AABB handling were relatively straightforward, but OBB support was more involved because it required using the separating axis theorem. Getting those cases working gave me much stronger intuition for how collision tests generalise once objects are no longer aligned to world axes.</p>
+			<h3>Rigidbody Simulation Challenges</h3>
+			<p>Once collision detection was in place, I built a simple entity-component style data layout for simulated bodies, storing properties in a struct-of-arrays arrangement. For simulation, I used rotation matrices to represent orientation and rotational momentum, and velocity Verlet integration to step the system forward.</p>
+			<p>This was the part of the project that took the most iteration. A lot of the work was in debugging unstable behaviour: objects flying away, rotating incorrectly, or responding unpredictably after collisions. Friction in particular took a long time to get right in 3D. One issue was a friction calculation that could produce invalid impulses when the tangent vector had zero length; adding a guard for that case fixed a class of &quot;exploding&quot; simulations and made the engine much more stable.</p>
+			<p>Another bug appeared when a sphere and an AABB occupied exactly the same position. In that case, the collision code tried to normalise a zero-length vector, which produced a NaN penetration normal and quickly contaminated both bodies&#39; positions. I fixed that edge case by detecting it explicitly in the overlap test and substituting a safe fallback normal pointing upward, with a penetration depth of 1. Handling cases like that was a good reminder that simulation code often fails at degenerate inputs rather than only in the common path.</p>
+			<h3>Optimisations</h3>
+			<p>After the basic simulation was working, I added two optimisations to make larger scenes practical.</p>
+			<p>The first was an octree broad-phase, which reduced the number of narrow-phase collision checks that had to run each update. The second was sleeping: bodies with near-zero velocity were removed from active simulation until disturbed by another collision or an external force.</p>
+			<p>In a test scene with 800 randomly scattered spheres, AABBs, and OBBs falling onto a ground object, the simulation initially took about 50 ms per update. Adding the octree reduced that to around 30 ms, and once sleeping was enabled the cost dropped to roughly 5 ms after most objects had settled. That gave me a useful before-and-after measure for the value of both optimisations.</p>
+			<div class="center-content"><video src="videos/phys/sleep.mp4" controls width="80%"></video></div>
+			<h3>Turning the Engine into a Game</h3>
+			<p>Once the engine was stable enough, I wrapped it in a small racing game, which was the intended scenario for the assignment. I created a car controller driven by keyboard-applied impulses, added a chase camera, and implemented a lap timing system to support time-trial gameplay.</p>
+			<p>I also created a track in Blender and wrote a small Python script to export the positions and orientations of level objects into a C++ array that could be copied directly into the project. That let me build the level visually while still keeping the runtime simple.</p>
+			<h2>Results</h2>
+			<hr />
+			<p>The final submission received 91%. More importantly, I felt the project succeeded at the goal I had set for it: to build a working rigidbody system from first principles, understand where its failure cases came from, and then apply it to a small but complete interactive scenario. It was stable and performed well even when simulating hundreds of rigidbodies.</p>
+			<h2>Reflection</h2>
+			<hr />
+			<p>This project was successful for me both as a piece of coursework and as a learning exercise. The final game is visually simple, but that was a deliberate tradeoff in favour of spending time on the simulation itself. The most valuable part of the process was learning how many small details are involved in making even a basic physics engine feel stable and believable.</p>
+			<p>It also gave me a much stronger grounding in impulses, friction, energy conservation, numerical integration, discrete-time accuracy issues, and the separating axis theorem. If I were continuing this work, I would be interested in exploring other kinds of simulation, especially soft bodies, springs, or fluid-like systems.</p>
+		</div>
+	</body>
+</html>

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Jackson Orr’s Portfolio</title>
+		<link rel="stylesheet" href="styles.css" />
+	</head>
+	<body>
+		<div class="content">
+			<div class="header">
+				<h1>Jackson Orr's Portfolio</h1>
+				<div class="contact">
+					<img src="images/pin.png" width="18" style="vertical-align: text-bottom;"/>
+					Danville, CA, USA
+					<br />
+					<img src="images/envelope.png" width="18" style="vertical-align: text-bottom;"/>
+					scoptlie@protonmail.com
+				</div>
+			</div>
+			<hr />
+			<p>Hello! I'm a graduate of an undergraduate Games Technology course, and am seeking work as a games programmer. I am experienced at applying C++ to 3D rendering, physics, networking, and compilers, and have a deep personal interest in game engines and low-level systems.</p>
+			<h2>Featured Projects</h2>
+			<hr />
+			<table>
+				<tr>
+					<td>
+						<a class="project-link" href="nessr.html">
+							<h3>
+								NES Static Recompiler
+								<br />
+								<div class="techs">C++, Go, Python, SDL2, OpenGL</div>
+							</h3>
+							<img src="images/nessr.png" width="100%" />
+						</a>
+						<p>A static recompiler that translates NES ROMs into C++ code and executes them against an emulated PPU, featuring:</p>
+						<ul>
+							<li>Heuristic code code discovery method for symbolless binaries</li>
+							<li>Profile-guided optimisations</li>
+						</ul>
+					</td>
+					<td>
+						<a class="project-link" href="phys.html">
+							<h3>
+								3D Physics Engine + Racing Game
+								<br />
+								<div class="techs">C++, SDL2, OpenGL, ImGui</div>
+							</h3>
+							<img src="images/phys.png" width="100%" />
+						</a>
+						<p>A 3D physics engine written from scratch in C++ and used to implement a basic racing game, featuring:</p>
+						<ul>
+							<li>Bespoke 3D renderer written from scratch using OpenGL</li>
+							<li>Custom rigid body implementation, supporting spheres and OBBs</li>
+							<li>Octree-based broad-phase</li>
+							<li>Entity component system</li>
+						</ul>
+					</td>
+				</tr>
+			</table>
+		</div>
+	</body>
+</html>
